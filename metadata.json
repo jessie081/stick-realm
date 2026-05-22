@@ -1,0 +1,5 @@
+{
+  "name": "StickRealm",
+  "description": "A real-time multiplayer stickman arena game where you fight, level up, and dominate the leaderboard.",
+  "requestFramePermissions": []
+}
