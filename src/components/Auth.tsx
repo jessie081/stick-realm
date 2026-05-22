@@ -37,8 +37,13 @@ export const Auth: React.FC<AuthProps> = ({ onAuth }) => {
     const checkHealth = async () => {
       const timeElapsed = (Date.now() - connectionStartTime) / 1000;
       
+      // Connect to backend server
+      const serverUrl = window.location.hostname !== 'localhost' 
+        ? 'https://stick-realm.onrender.com' // Replace with your Render URL
+        : 'http://localhost:3000';
+      
       try {
-        const res = await fetch('/api/health');
+        const res = await fetch(`${serverUrl}/api/health`);
         const contentType = res.headers.get('content-type');
         
         if (res.ok && contentType && contentType.includes('application/json')) {

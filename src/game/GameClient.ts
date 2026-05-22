@@ -1,5 +1,15 @@
 import { io, Socket } from 'socket.io-client';
 
+// Connect to backend server
+const getServerUrl = () => {
+  // In production, connect to Render backend
+  if (window.location.hostname !== 'localhost') {
+    return 'https://stick-realm.onrender.com'; // Replace with your Render URL
+  }
+  // In development, connect to localhost
+  return 'http://localhost:3000';
+};
+
 export class GameClient {
   socket: Socket;
   players: any = {};
@@ -10,8 +20,9 @@ export class GameClient {
   onStateUpdate: (data: { players: any, interactables: any[], game: any }) => void;
 
   constructor(onStateUpdate: (data: { players: any, interactables: any[], game: any }) => void) {
-    // Connect to the same server (works for both dev and production)
-    this.socket = io();
+    const serverUrl = getServerUrl();
+    console.log('Connecting to server:', serverUrl);
+    this.socket = io(serverUrl);
     this.onStateUpdate = onStateUpdate;
 
     this.socket.on('init', (data) => {
