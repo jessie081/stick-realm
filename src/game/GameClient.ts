@@ -1,5 +1,8 @@
 import { io, Socket } from 'socket.io-client';
 
+// Backend server URL
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+
 export class GameClient {
   socket: Socket;
   players: any = {};
@@ -10,8 +13,8 @@ export class GameClient {
   onStateUpdate: (data: { players: any, interactables: any[], game: any }) => void;
 
   constructor(onStateUpdate: (data: { players: any, interactables: any[], game: any }) => void) {
-    // Connect to the same server (works when frontend and backend are together)
-    this.socket = io();
+    console.log('Connecting to server:', SERVER_URL);
+    this.socket = io(SERVER_URL);
     this.onStateUpdate = onStateUpdate;
 
     this.socket.on('init', (data) => {

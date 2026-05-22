@@ -33,12 +33,14 @@ export const Auth: React.FC<AuthProps> = ({ onAuth }) => {
   const [connectionStartTime] = useState(Date.now());
   const [detailedStatus, setDetailedStatus] = useState('Initializing...');
 
+  const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+
   useEffect(() => {
     const checkHealth = async () => {
       const timeElapsed = (Date.now() - connectionStartTime) / 1000;
       
       try {
-        const res = await fetch('/api/health');
+        const res = await fetch(`${SERVER_URL}/api/health`);
         const contentType = res.headers.get('content-type');
         
         if (res.ok && contentType && contentType.includes('application/json')) {
