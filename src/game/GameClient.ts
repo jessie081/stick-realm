@@ -1,5 +1,15 @@
 import { io, Socket } from 'socket.io-client';
 
+// Determine the server URL based on environment
+const getServerUrl = () => {
+  // In production, use the Render backend URL
+  if (import.meta.env.PROD) {
+    return import.meta.env.VITE_SERVER_URL || 'https://stick-realm.onrender.com';
+  }
+  // In development, use localhost
+  return 'http://localhost:3000';
+};
+
 export class GameClient {
   socket: Socket;
   players: any = {};
@@ -10,7 +20,9 @@ export class GameClient {
   onStateUpdate: (data: { players: any, interactables: any[], game: any }) => void;
 
   constructor(onStateUpdate: (data: { players: any, interactables: any[], game: any }) => void) {
-    this.socket = io();
+    const serverUrl = getServerUrl();
+    console.log('Connecting to server:', serverUrl);
+    this.socket = io(serverUrl);
     this.onStateUpdate = onStateUpdate;
 
     this.socket.on('init', (data) => {

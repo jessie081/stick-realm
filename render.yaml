@@ -1,8 +1,7 @@
 services:
   - type: web
-    name: stickrealm
+    name: stick-realm
     env: node
-    region: oregon
     plan: free
     buildCommand: npm install && npm run build
     startCommand: npm start
@@ -10,7 +9,5 @@ services:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 3000
-      - key: MONGODB_URI
-        sync: false
-        # Add your MongoDB URI in Render dashboard if needed
+        value: 10000
+    healthCheckPath: /api/health
