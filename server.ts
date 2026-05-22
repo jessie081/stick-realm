@@ -22,7 +22,7 @@ process.on('uncaughtException', (err) => {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 const USE_MONGODB = process.env.MONGODB_URI ? true : false;
 console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('Database Mode:', USE_MONGODB ? 'MongoDB' : 'In-Memory');
@@ -434,6 +434,76 @@ async function startServer() {
     broadcastGameUpdate();
   }
 
+  // Helper functions for damage and kill handling
+  function applyDamage(attacker: any, target: any, damage: number) {
+    const now = Date.now();
+    let finalDamage = damage;
+
+    // Attacker Buffs
+    if (attacker.buffs.damage > now) finalDamage *= 1.5;
+    if (attacker.buffs.rage > now) finalDamage *= 1.3;
+
+    // Target Buffs
+    if (target.buffs.shield > now) finalDamage *= 0.5;
+    if (target.buffs.guard > now) finalDamage *= 0.2;
+
+    target.health -= finalDamage;
+    target.lastHit = now;
+    io.emit('playerHit', { targetId: target.id, attackerId: attacker.id, damage: finalDamage, health: target.health });
+
+    if (target.health <= 0) {
+      handleKill(attacker, target);
+    }
+  }
+
+  function handleKill(attacker: any, target: any) {
+    const now = Date.now();
+    attacker.kills++;
+    target.deaths++;
+    attacker.xp += 50;
+
+    if (currentMode === GameMode.TEAM_BATTLE) {
+      teamScores[attacker.team as 'red' | 'blue']++;
+    }
+
+    const killMsg = { attacker: attacker.username, victim: target.username, time: now };
+    killFeed.push(killMsg);
+    io.emit('killFeed', killMsg);
+
+    if (attacker.xp >= attacker.level * 100) {
+      attacker.level++;
+      attacker.xp = 0;
+      attacker.maxHealth += 20;
+      attacker.health = attacker.maxHealth;
+    }
+
+    io.emit('playerKilled', { victimId: target.id, attackerId: attacker.id });
+
+    // Win Condition Checks
+    if (currentMode === GameMode.DEATHMATCH && attacker.kills >= WIN_KILLS) {
+      endGame(`${attacker.username} Wins!`);
+    } else if (currentMode === GameMode.TEAM_BATTLE && teamScores[attacker.team as 'red' | 'blue'] >= WIN_KILLS * 2) {
+      endGame(`${attacker.team === 'red' ? 'Red' : 'Blue'} Team Wins!`);
+    } else if (currentMode === GameMode.SURVIVAL) {
+      const alive: any[] = Object.values(players).filter((p: any) => p.health > 0);
+      if (alive.length === 1) {
+        endGame(`${alive[0].username} is the Survivor!`);
+      }
+    }
+
+    // Respawn
+    if (currentMode !== GameMode.SURVIVAL) {
+      setTimeout(() => {
+        if (players[target.id]) {
+          players[target.id].health = players[target.id].maxHealth;
+          players[target.id].x = Math.random() * MAP_WIDTH;
+          players[target.id].y = Math.random() * MAP_HEIGHT;
+          io.emit('playerRespawn', players[target.id]);
+        }
+      }, 3000);
+    }
+  }
+
   // Timer Tick
   setInterval(() => {
     if (gameTimer > 0) {
@@ -564,75 +634,6 @@ async function startServer() {
           break;
       }
     });
-
-    function applyDamage(attacker: any, target: any, damage: number) {
-      const now = Date.now();
-      let finalDamage = damage;
-
-      // Attacker Buffs
-      if (attacker.buffs.damage > now) finalDamage *= 1.5;
-      if (attacker.buffs.rage > now) finalDamage *= 1.3;
-
-      // Target Buffs
-      if (target.buffs.shield > now) finalDamage *= 0.5;
-      if (target.buffs.guard > now) finalDamage *= 0.2;
-
-      target.health -= finalDamage;
-      target.lastHit = now;
-      io.emit('playerHit', { targetId: target.id, attackerId: attacker.id, damage: finalDamage, health: target.health });
-
-      if (target.health <= 0) {
-        handleKill(attacker, target);
-      }
-    }
-
-    function handleKill(attacker: any, target: any) {
-      const now = Date.now();
-      attacker.kills++;
-      target.deaths++;
-      attacker.xp += 50;
-
-      if (currentMode === GameMode.TEAM_BATTLE) {
-        teamScores[attacker.team as 'red' | 'blue']++;
-      }
-
-      const killMsg = { attacker: attacker.username, victim: target.username, time: now };
-      killFeed.push(killMsg);
-      io.emit('killFeed', killMsg);
-
-      if (attacker.xp >= attacker.level * 100) {
-        attacker.level++;
-        attacker.xp = 0;
-        attacker.maxHealth += 20;
-        attacker.health = attacker.maxHealth;
-      }
-
-      io.emit('playerKilled', { victimId: target.id, attackerId: attacker.id });
-
-      // Win Condition Checks
-      if (currentMode === GameMode.DEATHMATCH && attacker.kills >= WIN_KILLS) {
-        endGame(`${attacker.username} Wins!`);
-      } else if (currentMode === GameMode.TEAM_BATTLE && teamScores[attacker.team as 'red' | 'blue'] >= WIN_KILLS * 2) {
-        endGame(`${attacker.team === 'red' ? 'Red' : 'Blue'} Team Wins!`);
-      } else if (currentMode === GameMode.SURVIVAL) {
-        const alive: any[] = Object.values(players).filter((p: any) => p.health > 0);
-        if (alive.length === 1) {
-          endGame(`${alive[0].username} is the Survivor!`);
-        }
-      }
-
-      // Respawn
-      if (currentMode !== GameMode.SURVIVAL) {
-        setTimeout(() => {
-          if (players[target.id]) {
-            players[target.id].health = players[target.id].maxHealth;
-            players[target.id].x = Math.random() * MAP_WIDTH;
-            players[target.id].y = Math.random() * MAP_HEIGHT;
-            io.emit('playerRespawn', players[target.id]);
-          }
-        }, 3000);
-      }
-    }
 
     socket.on('attack', () => {
       const attacker = players[socket.id];
